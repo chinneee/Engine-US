@@ -355,6 +355,100 @@ def main():
             - Dữ liệu sẽ ghi đè worksheet "T. Launching"
             """)
     
+    # Tab 4: Data SellerBoard
+    with tab4:
+        st.markdown('<h2 class="tab-header">📈 Data SellerBoard</h2>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown('<div class="info-box">📊 Upload file SellerBoard (.xlsx)</div>', unsafe_allow_html=True)
+            
+            sellerboard_file = st.file_uploader(
+                "Chọn file SellerBoard",
+                type=['xlsx', 'xls'],
+                key="sellerboard_uploader",
+                help="File format: NewEleven_Dashboard Products Group by ASIN_DD_MM_YYYY-DD_MM_YYYY_(timestamp).xlsx"
+            )
+            
+            if sellerboard_file is not None:
+                if validate_file_format(sellerboard_file, "xlsx"):
+                    # Extract date info from filename
+                    month, quarter, year = extract_date_from_filename(sellerboard_file.name)
+                    
+                    if month and quarter and year:
+                        st.success(f"✅ Detected: Tháng {month}/{year} - Quarter {quarter}")
+                        
+                        # Process file
+                        df = process_excel_file(sellerboard_file)
+                        
+                        if df is not None:
+                            st.success(f"✅ Đã đọc file thành công! ({len(df)} dòng dữ liệu)")
+                            
+                            # Add Month and Quarter columns
+                            df_with_metadata = add_month_quarter_columns(df, month, quarter)
+                            
+                            if df_with_metadata is not None:
+                                # Preview data with new columns
+                                st.subheader("👀 Preview dữ liệu (với cột Month & Quarter):")
+                                st.dataframe(df_with_metadata.head(10), use_container_width=True)
+                                
+                                # Show column info
+                                st.info(f"📋 Tổng cộng: {len(df_with_metadata.columns)} cột, {len(df_with_metadata)} dòng")
+                                
+                                # Update button
+                                if st.session_state.authenticated:
+                                    # Check existing data count
+                                    worksheet = get_google_sheet(st.session_state.client, sheet_id, "SB_US_2025")
+                                    if worksheet:
+                                        existing_count = get_existing_data_count(worksheet)
+                                        st.info(f"📊 Dữ liệu hiện tại trong sheet SB_US_2025: {existing_count} dòng")
+                                    
+                                    if st.button("📈 Append to SB_US_2025", key="append_sellerboard"):
+                                        with st.spinner("Đang append dữ liệu..."):
+                                            if worksheet:
+                                                if append_to_sheet(worksheet, df_with_metadata):
+                                                    new_count = get_existing_data_count(worksheet)
+                                                    added_rows = new_count - existing_count
+                                                    st.markdown(f'<div class="success-box">✅ Append SellerBoard thành công!<br>📊 Đã thêm {added_rows} dòng dữ liệu<br>📈 Tổng dữ liệu hiện tại: {new_count} dòng</div>', unsafe_allow_html=True)
+                                                    st.balloons()
+                                                else:
+                                                    st.markdown('<div class="error-box">❌ Append thất bại!</div>', unsafe_allow_html=True)
+                                else:
+                                    st.warning("⚠️ Vui lòng kết nối Google Sheets trước!")
+                    else:
+                        st.error("❌ Không thể detect tháng/năm từ tên file. Vui lòng kiểm tra format tên file!")
+                        st.info("📝 Format đúng: NewEleven_Dashboard Products Group by ASIN_DD_MM_YYYY-DD_MM_YYYY_(timestamp).xlsx")
+                else:
+                    st.error("❌ File không đúng định dạng .xlsx/.xls")
+        
+        with col2:
+            st.info("""
+            **📋 Hướng dẫn:**
+            1. Chọn file .xlsx SellerBoard
+            2. Hệ thống tự động detect tháng/quarter
+            3. Thêm cột Month & Quarter
+            4. Append vào sheet SB_US_2025
+            
+            **📝 Format tên file:**
+            ```
+            NewEleven_Dashboard Products Group by ASIN_
+            01_07_2025-31_07_2025_
+            (08_44_44_695).xlsx
+            ```
+            
+            **🔢 Quarter mapping:**
+            - Q1: Tháng 1,2,3
+            - Q2: Tháng 4,5,6  
+            - Q3: Tháng 7,8,9
+            - Q4: Tháng 10,11,12
+            
+            **⚠️ Lưu ý:**
+            - Dữ liệu sẽ được append vào cuối sheet
+            - Thứ tự cột sẽ được maintain theo sheet gốc
+            - Cột Month và Quarter sẽ được thêm vào đầu
+            """)
+    
     # Footer
     st.markdown("---")
     st.markdown("""
