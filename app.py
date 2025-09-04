@@ -194,7 +194,8 @@ def append_to_sheet(worksheet, new_data):
         else:
             # Append data starting from the next row after existing data
             start_row = existing_rows + 2  # +2 because row 1 is header, and we want next row after last data
-            
+            # Trước khi convert DataFrame thành list để append
+            reordered_data = reordered_data.fillna("")
             # Convert dataframe to list of lists for appending
             values_to_append = reordered_data.values.tolist()
             
