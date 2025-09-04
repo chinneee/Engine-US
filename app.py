@@ -4,8 +4,8 @@ import gspread
 from gspread_dataframe import set_with_dataframe
 from google.oauth2.service_account import Credentials
 import json
-import re
 import io
+import re
 from datetime import datetime
 import time
 
@@ -109,6 +109,105 @@ def update_sheet_data(worksheet, data):
         st.error(f"❌ Lỗi cập nhật dữ liệu: {str(e)}")
         return False
 
+def extract_date_from_filename(filename):
+    """Extract start and end date from SellerBoard filename"""
+    try:
+        # Pattern: NewEleven_Dashboard Products Group by ASIN_01_07_2025-31_07_2025_(08_44_44_695).xlsx
+        pattern = r'(\d{2}_\d{2}_\d{4})-(\d{2}_\d{2}_\d{4})'
+        match = re.search(pattern, filename)
+        
+        if match:
+            start_date_str = match.group(1)  # 01_07_2025
+            end_date_str = match.group(2)    # 31_07_2025
+            
+            # Extract month from start date (format: DD_MM_YYYY)
+            month = int(start_date_str.split('_')[1])
+            year = int(start_date_str.split('_')[2])
+            
+            # Calculate quarter
+            quarter = (month - 1) // 3 + 1
+            
+            return month, quarter, year
+        else:
+            return None, None, None
+    except Exception as e:
+        st.error(f"❌ Lỗi extract ngày từ filename: {str(e)}")
+        return None, None, None
+
+def add_month_quarter_columns(df, month, quarter):
+    """Add Month and Quarter columns to dataframe"""
+    try:
+        df_copy = df.copy()
+        
+        # Add Month and Quarter columns at the beginning
+        df_copy.insert(0, 'Quarter', quarter)
+        df_copy.insert(1, 'Month', month)
+        
+        return df_copy
+    except Exception as e:
+        st.error(f"❌ Lỗi thêm cột Month/Quarter: {str(e)}")
+        return None
+
+def get_existing_data_count(worksheet):
+    """Get number of existing rows in worksheet (excluding header)"""
+    try:
+        all_values = worksheet.get_all_values()
+        # Subtract 1 for header row, return 0 if only header exists
+        return max(0, len(all_values) - 1)
+    except Exception as e:
+        st.error(f"❌ Lỗi đếm dữ liệu hiện có: {str(e)}")
+        return 0
+
+def append_to_sheet(worksheet, new_data):
+    """Append new data to existing sheet while maintaining column order"""
+    try:
+        # Get existing headers to maintain column order
+        existing_headers = worksheet.row_values(1)
+        
+        if not existing_headers:
+            # If no headers exist, write everything including headers
+            set_with_dataframe(worksheet, new_data, include_index=False)
+            return True
+        
+        # Ensure new data has same column structure as existing sheet
+        # Reorder columns to match existing sheet structure
+        reordered_data = pd.DataFrame()
+        
+        for header in existing_headers:
+            if header in new_data.columns:
+                reordered_data[header] = new_data[header]
+            else:
+                # If column doesn't exist in new data, fill with empty values
+                reordered_data[header] = ""
+        
+        # Add any new columns that don't exist in existing sheet
+        for col in new_data.columns:
+            if col not in existing_headers:
+                reordered_data[col] = new_data[col]
+        
+        # Get existing data count
+        existing_rows = get_existing_data_count(worksheet)
+        
+        if existing_rows == 0:
+            # No existing data, write with headers
+            set_with_dataframe(worksheet, reordered_data, include_index=False)
+        else:
+            # Append data starting from the next row after existing data
+            start_row = existing_rows + 2  # +2 because row 1 is header, and we want next row after last data
+            
+            # Convert dataframe to list of lists for appending
+            values_to_append = reordered_data.values.tolist()
+            
+            # Append row by row
+            for i, row in enumerate(values_to_append):
+                worksheet.insert_row(row, start_row + i)
+        
+        return True
+        
+    except Exception as e:
+        st.error(f"❌ Lỗi append dữ liệu: {str(e)}")
+        return False
+
 def validate_file_format(uploaded_file, expected_format):
     """Validate uploaded file format"""
     if expected_format == "txt":
@@ -188,8 +287,8 @@ def main():
         else:
             st.warning("🟡 Chưa kết nối Google Sheets")
     
-    # Main content tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📦 Update Inventory", "🏷️ Update T. ASIN", "🚀 Update T. Launching", "Data SellerBoard"])
+    # Main content tabs - FIX: Added tab4
+    tab1, tab2, tab3, tab4 = st.tabs(["📦 Update Inventory", "🏷️ Update T. ASIN", "🚀 Update T. Launching", "📈 Data SellerBoard"])
     
     # Tab 1: Update Inventory
     with tab1:
