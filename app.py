@@ -188,7 +188,7 @@ def main():
             st.warning("🟡 Chưa kết nối Google Sheets")
     
     # Main content tabs
-    tab1, tab2, tab3 = st.tabs(["📦 Update Inventory", "🏷️ Update T. ASIN", "🚀 Update T. Launching"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📦 Update Inventory", "🏷️ Update T. ASIN", "🚀 Update T. Launching", "Data SellerBoard"])
     
     # Tab 1: Update Inventory
     with tab1:
