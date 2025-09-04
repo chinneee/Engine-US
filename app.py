@@ -159,55 +159,48 @@ def get_existing_data_count(worksheet):
         return 0
 
 def append_to_sheet(worksheet, new_data):
-    """Append new data to existing sheet while maintaining column order"""
+    """Append new data to existing sheet nhanh hơn"""
     try:
-        # Get existing headers to maintain column order
+        # Lấy header hiện tại
         existing_headers = worksheet.row_values(1)
-        
+
         if not existing_headers:
-            # If no headers exist, write everything including headers
-            set_with_dataframe(worksheet, new_data, include_index=False)
+            # Nếu sheet rỗng thì ghi luôn cả header + data
+            set_with_dataframe(worksheet, new_data.fillna(""), include_index=False)
             return True
-        
-        # Ensure new data has same column structure as existing sheet
-        # Reorder columns to match existing sheet structure
+
+        # Đảm bảo thứ tự cột theo sheet
         reordered_data = pd.DataFrame()
-        
         for header in existing_headers:
             if header in new_data.columns:
                 reordered_data[header] = new_data[header]
             else:
-                # If column doesn't exist in new data, fill with empty values
                 reordered_data[header] = ""
-        
-        # Add any new columns that don't exist in existing sheet
+
+        # Thêm các cột mới (nếu có)
         for col in new_data.columns:
             if col not in existing_headers:
                 reordered_data[col] = new_data[col]
-        
-        # Get existing data count
-        existing_rows = get_existing_data_count(worksheet)
-        
-        if existing_rows == 0:
-            # No existing data, write with headers
-            set_with_dataframe(worksheet, reordered_data, include_index=False)
-        else:
-            # Append data starting from the next row after existing data
-            start_row = existing_rows + 2  # +2 because row 1 is header, and we want next row after last data
-            # Trước khi convert DataFrame thành list để append
-            reordered_data = reordered_data.fillna("")
-            # Convert dataframe to list of lists for appending
-            values_to_append = reordered_data.values.tolist()
-            
-            # Append row by row
-            for i, row in enumerate(values_to_append):
-                worksheet.insert_row(row, start_row + i)
-        
+
+        # Xử lý NaN
+        reordered_data = reordered_data.fillna("")
+
+        # Lấy số dòng hiện có (trừ header)
+        existing_rows = len(worksheet.get_all_values()) - 1
+
+        # Ghi dữ liệu mới bắt đầu từ dòng tiếp theo
+        set_with_dataframe(
+            worksheet,
+            reordered_data,
+            include_index=False,
+            row=existing_rows + 2  # +2 vì row 1 là header
+        )
         return True
-        
+
     except Exception as e:
         st.error(f"❌ Lỗi append dữ liệu: {str(e)}")
         return False
+
 
 def validate_file_format(uploaded_file, expected_format):
     """Validate uploaded file format"""
