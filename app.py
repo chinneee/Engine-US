@@ -159,47 +159,28 @@ def get_existing_data_count(worksheet):
         return 0
 
 def append_to_sheet(worksheet, new_data):
-    """Append new data to existing sheet nhanh hơn"""
+    """Append new data vào sheet, không ghi header"""
     try:
-        # Lấy header hiện tại
-        existing_headers = worksheet.row_values(1)
+        # Xử lý NaN thành chuỗi rỗng
+        new_data = new_data.fillna("")
 
-        if not existing_headers:
-            # Nếu sheet rỗng thì ghi luôn cả header + data
-            set_with_dataframe(worksheet, new_data.fillna(""), include_index=False)
-            return True
+        # Lấy số dòng hiện có (bao gồm header nếu có)
+        existing_rows = len(worksheet.get_all_values())
 
-        # Đảm bảo thứ tự cột theo sheet
-        reordered_data = pd.DataFrame()
-        for header in existing_headers:
-            if header in new_data.columns:
-                reordered_data[header] = new_data[header]
-            else:
-                reordered_data[header] = ""
-
-        # Thêm các cột mới (nếu có)
-        for col in new_data.columns:
-            if col not in existing_headers:
-                reordered_data[col] = new_data[col]
-
-        # Xử lý NaN
-        reordered_data = reordered_data.fillna("")
-
-        # Lấy số dòng hiện có (trừ header)
-        existing_rows = len(worksheet.get_all_values()) - 1
-
-        # Ghi dữ liệu mới bắt đầu từ dòng tiếp theo
+        # Append data bắt đầu từ dòng kế tiếp
         set_with_dataframe(
             worksheet,
-            reordered_data,
+            new_data,
             include_index=False,
-            row=existing_rows + 2  # +2 vì row 1 là header
+            header=False,            # 🚀 Không ghi header
+            row=existing_rows + 1    # Ghi từ dòng tiếp theo
         )
         return True
 
     except Exception as e:
         st.error(f"❌ Lỗi append dữ liệu: {str(e)}")
         return False
+
 
 
 def validate_file_format(uploaded_file, expected_format):
