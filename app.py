@@ -561,7 +561,7 @@ def main():
             **⚠️ Lưu ý:**
             - Dữ liệu sẽ được append vào cuối sheet
             - Thứ tự cột sẽ được maintain theo sheet gốc
-            - Cột Month và Quarter sẽ được thêm vào đầu
+            - Cột Month và Quarter sẽ được thêm vào cuối
             """)
 
     # Tab 5: Data Brand Analytics
@@ -630,7 +630,31 @@ def main():
                         st.info("📝 Format đúng: US_Search_Catalog_Performance_Simple_Month_2025_07_31.xlsx")
                 else:
                     st.error("❌ File không đúng định dạng .xlsx/.xls")
-        
+        with col2:
+            st.info("""
+            **📋 Hướng dẫn:**
+            1. Chọn file .xlsx Brand Analytics
+            2. Hệ thống tự động detect tháng/quarter
+            3. Thêm cột Month & Quarter
+            4. Append vào sheet BA_US_2025
+            
+            **📝 Format tên file:**
+            ```
+            US_Search_Catalog_Performance_
+            Simple_Month_2025_07_31.xlsx
+            ```
+                    
+            **🔢 Quarter mapping:**
+            - Q1: Tháng 1,2,3
+            - Q2: Tháng 4,5,6  
+            - Q3: Tháng 7,8,9
+            - Q4: Tháng 10,11,12
+            
+            **⚠️ Lưu ý:**
+            - Dữ liệu sẽ được append vào cuối sheet
+            - Thứ tự cột sẽ được maintain theo sheet gốc
+            - Cột Month và Quarter sẽ được thêm vào cuối
+            """)    
     # Footer
     st.markdown("---")
     st.markdown("""
