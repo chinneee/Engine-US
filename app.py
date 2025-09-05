@@ -269,6 +269,15 @@ def process_excel_file(uploaded_file):
     except Exception as e:
         st.error(f"❌ Lỗi đọc file Excel: {str(e)}")
         return None
+    
+def process_csv_file(uploaded_file):
+    """Process Excel file (.xlsx)"""
+    try:
+        df = pd.read_csv(uploaded_file)
+        return df
+    except Exception as e:
+        st.error(f"❌ Lỗi đọc file Excel: {str(e)}")
+        return None
 
 # Main app
 def main():
@@ -571,17 +580,17 @@ def main():
         col1, col2 = st.columns([2, 1])
         
         with col1:
-            st.markdown('<div class="info-box">📊 Upload file Brand Analytics (.xlsx)</div>', unsafe_allow_html=True)
+            st.markdown('<div class="info-box">📊 Upload file Brand Analytics (.csv)</div>', unsafe_allow_html=True)
             
             brand_analytics_file = st.file_uploader(
                 "Chọn file Brand Analytics",
-                type=['xlsx', 'xls'],
+                type=['csv'],
                 key="brand_analytics_uploader",
-                help="File format: US_Search_Catalog_Performance_Simple_Month_YYYY_MM_DD.xlsx"
+                help="File format: US_Search_Catalog_Performance_Simple_Month_YYYY_MM_DD.csv"
             )
             
             if brand_analytics_file is not None:
-                if validate_file_format(brand_analytics_file, "xlsx"):
+                if validate_file_format(brand_analytics_file, "csv"):
                     # Extract date info from filename
                     month, quarter, year = extract_date_from_brand_analytics_filename(brand_analytics_file.name)
                     
@@ -589,7 +598,7 @@ def main():
                         st.success(f"✅ Detected: Tháng {month}/{year} - Quarter {quarter}")
                         
                         # Process file
-                        df = process_excel_file(brand_analytics_file)
+                        df = process_csv_file(brand_analytics_file)
                         
                         if df is not None:
                             st.success(f"✅ Đã đọc file thành công! ({len(df)} dòng dữ liệu)")
