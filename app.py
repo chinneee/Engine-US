@@ -138,7 +138,7 @@ def extract_date_from_brand_analytics_filename(filename):
     """Extract month and year from Brand Analytics filename"""
     try:
         # Pattern: US_Search_Catalog_Performance_Simple_Month_2025_07_31
-        pattern = r'(\d{4})_(\d{2})_(\d{2})\.xlsx?$'
+        pattern = r'(\d{4})_(\d{2})_(\d{2})\.csv?$'
         match = re.search(pattern, filename)
         
         if match:
