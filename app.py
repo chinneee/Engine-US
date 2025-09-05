@@ -134,6 +134,28 @@ def extract_date_from_filename(filename):
         st.error(f"❌ Lỗi extract ngày từ filename: {str(e)}")
         return None, None, None
 
+def extract_date_from_brand_analytics_filename(filename):
+    """Extract month and year from Brand Analytics filename"""
+    try:
+        # Pattern: US_Search_Catalog_Performance_Simple_Month_2025_07_31
+        pattern = r'(\d{4})_(\d{2})_(\d{2})\.xlsx?$'
+        match = re.search(pattern, filename)
+        
+        if match:
+            year = int(match.group(1))    # 2025
+            month = int(match.group(2))   # 07
+            day = int(match.group(3))     # 31
+            
+            # Calculate quarter
+            quarter = (month - 1) // 3 + 1
+            
+            return month, quarter, year
+        else:
+            return None, None, None
+    except Exception as e:
+        st.error(f"❌ Lỗi extract ngày từ Brand Analytics filename: {str(e)}")
+        return None, None, None
+
 def add_month_quarter_columns(df, month, quarter):
     """Add Month and Quarter columns to dataframe"""
     try:
@@ -163,7 +185,6 @@ def append_to_sheet(worksheet, new_data):
     try:
         # Lấy header hiện tại
         existing_headers = worksheet.row_values(1)
-
         if not existing_headers:
             # Nếu sheet rỗng thì ghi luôn cả header + data
             set_with_dataframe(worksheet, new_data.fillna(""), include_index=False)
@@ -198,11 +219,9 @@ def append_to_sheet(worksheet, new_data):
         )
 
         return True
-
     except Exception as e:
         st.error(f"❌ Lỗi append dữ liệu: {str(e)}")
         return False
-
 
 def validate_file_format(uploaded_file, expected_format):
     """Validate uploaded file format"""
@@ -283,8 +302,8 @@ def main():
         else:
             st.warning("🟡 Chưa kết nối Google Sheets")
     
-    # Main content tabs - FIX: Added tab4
-    tab1, tab2, tab3, tab4 = st.tabs(["📦 Update Inventory", "🏷️ Update T. ASIN", "🚀 Update T. Launching", "📈 Data SellerBoard"])
+    # Main content tabs - Added tab5 for Brand Analytics
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📦 Update Inventory", "🏷️ Update T. ASIN", "🚀 Update T. Launching", "📈 Data SellerBoard", "🔍 Data Brand Analytics"])
     
     # Tab 1: Update Inventory
     with tab1:
@@ -544,7 +563,74 @@ def main():
             - Thứ tự cột sẽ được maintain theo sheet gốc
             - Cột Month và Quarter sẽ được thêm vào đầu
             """)
-    
+
+    # Tab 5: Data Brand Analytics
+    with tab5:
+        st.markdown('<h2 class="tab-header">🔍 Data Brand Analytics</h2>', unsafe_allow_html=True)
+        
+        col1, col2 = st.columns([2, 1])
+        
+        with col1:
+            st.markdown('<div class="info-box">📊 Upload file Brand Analytics (.xlsx)</div>', unsafe_allow_html=True)
+            
+            brand_analytics_file = st.file_uploader(
+                "Chọn file Brand Analytics",
+                type=['xlsx', 'xls'],
+                key="brand_analytics_uploader",
+                help="File format: US_Search_Catalog_Performance_Simple_Month_YYYY_MM_DD.xlsx"
+            )
+            
+            if brand_analytics_file is not None:
+                if validate_file_format(brand_analytics_file, "xlsx"):
+                    # Extract date info from filename
+                    month, quarter, year = extract_date_from_brand_analytics_filename(brand_analytics_file.name)
+                    
+                    if month and quarter and year:
+                        st.success(f"✅ Detected: Tháng {month}/{year} - Quarter {quarter}")
+                        
+                        # Process file
+                        df = process_excel_file(brand_analytics_file)
+                        
+                        if df is not None:
+                            st.success(f"✅ Đã đọc file thành công! ({len(df)} dòng dữ liệu)")
+                            
+                            # Add Month and Quarter columns
+                            df_with_metadata = add_month_quarter_columns(df, month, quarter)
+                            
+                            if df_with_metadata is not None:
+                                # Preview data with new columns
+                                st.subheader("👀 Preview dữ liệu (với cột Month & Quarter):")
+                                st.dataframe(df_with_metadata.head(10), use_container_width=True)
+                                
+                                # Show column info
+                                st.info(f"📋 Tổng cộng: {len(df_with_metadata.columns)} cột, {len(df_with_metadata)} dòng")
+                                
+                                # Update button
+                                if st.session_state.authenticated:
+                                    # Check existing data count
+                                    worksheet = get_google_sheet(st.session_state.client, sheet_id, "BA_US_2025")
+                                    if worksheet:
+                                        existing_count = get_existing_data_count(worksheet)
+                                        st.info(f"📊 Dữ liệu hiện tại trong sheet BA_US_2025: {existing_count} dòng")
+                                    
+                                    if st.button("🔍 Append to BA_US_2025", key="append_brand_analytics"):
+                                        with st.spinner("Đang append dữ liệu..."):
+                                            if worksheet:
+                                                if append_to_sheet(worksheet, df_with_metadata):
+                                                    new_count = get_existing_data_count(worksheet)
+                                                    added_rows = new_count - existing_count
+                                                    st.markdown(f'<div class="success-box">✅ Append Brand Analytics thành công!<br>📊 Đã thêm {added_rows} dòng dữ liệu<br>📈 Tổng dữ liệu hiện tại: {new_count} dòng</div>', unsafe_allow_html=True)
+                                                    st.balloons()
+                                                else:
+                                                    st.markdown('<div class="error-box">❌ Append thất bại!</div>', unsafe_allow_html=True)
+                                else:
+                                    st.warning("⚠️ Vui lòng kết nối Google Sheets trước!")
+                    else:
+                        st.error("❌ Không thể detect tháng/năm từ tên file. Vui lòng kiểm tra format tên file!")
+                        st.info("📝 Format đúng: US_Search_Catalog_Performance_Simple_Month_2025_07_31.xlsx")
+                else:
+                    st.error("❌ File không đúng định dạng .xlsx/.xls")
+        
     # Footer
     st.markdown("---")
     st.markdown("""
