@@ -281,6 +281,48 @@ def process_csv_file(uploaded_file):
         st.error(f"❌ Lỗi đọc file Excel: {str(e)}")
         return None
 
+def get_existing_columns(worksheet):
+    """Get existing column headers from worksheet"""
+    try:
+        headers = worksheet.row_values(1)
+        return [header for header in headers if header.strip()]  # Remove empty headers
+    except Exception as e:
+        st.error(f"❌ Lỗi lấy headers từ sheet: {str(e)}")
+        return []
+
+def filter_and_reorder_data(df, existing_columns):
+    """Filter dataframe to only include columns that exist in the target sheet and reorder them"""
+    try:
+        # Find matching columns (case-insensitive comparison)
+        df_columns_lower = {col.lower(): col for col in df.columns}
+        existing_columns_lower = {col.lower(): col for col in existing_columns}
+        
+        matching_columns = []
+        for existing_col_lower, existing_col in existing_columns_lower.items():
+            if existing_col_lower in df_columns_lower:
+                matching_columns.append((existing_col, df_columns_lower[existing_col_lower]))
+        
+        if not matching_columns:
+            st.error("❌ Không tìm thấy cột nào trùng khớp với sheet gốc!")
+            return None, [], []
+        
+        # Create filtered dataframe with correct column order
+        filtered_df = pd.DataFrame()
+        matched_sheet_columns = []
+        matched_file_columns = []
+        
+        for sheet_col, file_col in matching_columns:
+            filtered_df[sheet_col] = df[file_col]
+            matched_sheet_columns.append(sheet_col)
+            matched_file_columns.append(file_col)
+        
+        return filtered_df, matched_sheet_columns, matched_file_columns
+        
+    except Exception as e:
+        st.error(f"❌ Lỗi filter và reorder data: {str(e)}")
+        return None, [], []
+
+
 # Main app
 def main():
     st.markdown('<h1 class="main-header">📊 Data Update Manager</h1>', unsafe_allow_html=True)
@@ -576,6 +618,7 @@ def main():
             """)
 
     # Tab 5: Data Brand Analytics
+
     with tab5:
         st.markdown('<h2 class="tab-header">🔍 Data Brand Analytics</h2>', unsafe_allow_html=True)
         
@@ -593,49 +636,74 @@ def main():
             
             if brand_analytics_file is not None:
                 if validate_file_format(brand_analytics_file, "csv"):
-                    # Extract date info from filename
+                    # 1. Extract date info from filename
                     month, quarter, year = extract_date_from_brand_analytics_filename(brand_analytics_file.name)
                     
                     if month and quarter and year:
                         st.success(f"✅ Detected: Tháng {month}/{year} - Quarter {quarter}")
                         
-                        # Process file
+                        # 2. Process CSV file
                         df = process_csv_file(brand_analytics_file)
                         
                         if df is not None:
                             st.success(f"✅ Đã đọc file thành công! ({len(df)} dòng dữ liệu)")
+                            st.info(f"📊 Columns trong file: {len(df.columns)} cột")
                             
-                            # Add Month and Quarter columns
-                            df_with_metadata = add_month_quarter_columns(df, month, quarter)
-                            
-                            if df_with_metadata is not None:
-                                # Preview data with new columns
-                                st.subheader("👀 Preview dữ liệu (với cột Month & Quarter):")
-                                st.dataframe(df_with_metadata.head(10), use_container_width=True)
-                                
-                                # Show column info
-                                st.info(f"📋 Tổng cộng: {len(df_with_metadata.columns)} cột, {len(df_with_metadata)} dòng")
-                                
-                                # Update button
-                                if st.session_state.authenticated:
-                                    # Check existing data count
-                                    worksheet = get_google_sheet(st.session_state.client, sheet_id, "BA_US_2025")
-                                    if worksheet:
-                                        existing_count = get_existing_data_count(worksheet)
-                                        st.info(f"📊 Dữ liệu hiện tại trong sheet BA_US_2025: {existing_count} dòng")
+                            # Check authentication before getting sheet data
+                            if st.session_state.authenticated:
+                                # 3. Get existing columns from BA_US_2025 sheet
+                                worksheet = get_google_sheet(st.session_state.client, sheet_id, "BA_US_2025")
+                                if worksheet:
+                                    existing_columns = get_existing_columns(worksheet)
+                                    existing_count = get_existing_data_count(worksheet)
                                     
-                                    if st.button("🔍 Append to BA_US_2025", key="append_brand_analytics"):
-                                        with st.spinner("Đang append dữ liệu..."):
-                                            if worksheet:
-                                                if append_to_sheet(worksheet, df_with_metadata):
-                                                    new_count = get_existing_data_count(worksheet)
-                                                    added_rows = new_count - existing_count
-                                                    st.markdown(f'<div class="success-box">✅ Append Brand Analytics thành công!<br>📊 Đã thêm {added_rows} dòng dữ liệu<br>📈 Tổng dữ liệu hiện tại: {new_count} dòng</div>', unsafe_allow_html=True)
-                                                    st.balloons()
-                                                else:
-                                                    st.markdown('<div class="error-box">❌ Append thất bại!</div>', unsafe_allow_html=True)
+                                    if existing_columns:
+                                        st.info(f"📋 Columns trong sheet BA_US_2025: {len(existing_columns)} cột")
+                                        st.info(f"📊 Dữ liệu hiện tại trong sheet: {existing_count} dòng")
+                                        
+                                        # 4. Column Matching - Filter and reorder data
+                                        filtered_df, matched_sheet_cols, matched_file_cols = filter_and_reorder_data(df, existing_columns)
+                                        
+                                        if filtered_df is not None:
+                                            st.success(f"✅ Matched {len(matched_sheet_cols)} cột với sheet gốc")
+                                            
+                                            # Show matched columns in expandable table
+                                            with st.expander("📋 Chi tiết cột matched"):
+                                                match_info = pd.DataFrame({
+                                                    'Sheet Column': matched_sheet_cols,
+                                                    'File Column': matched_file_cols
+                                                })
+                                                st.dataframe(match_info, use_container_width=True)
+                                            
+                                            # 5. Add Month and Quarter columns
+                                            df_with_metadata = add_month_quarter_columns(filtered_df, month, quarter)
+                                            
+                                            if df_with_metadata is not None:
+                                                # Data Preview with filtered data
+                                                st.subheader("👀 Preview dữ liệu đã filter (với cột Month & Quarter):")
+                                                st.dataframe(df_with_metadata.head(10), use_container_width=True)
+                                                
+                                                # Show final column info
+                                                st.info(f"📋 Dữ liệu cuối cùng: {len(df_with_metadata.columns)} cột, {len(df_with_metadata)} dòng")
+                                                
+                                                # 6. Append button - only compatible columns
+                                                if st.button("🔍 Append to BA_US_2025", key="append_brand_analytics"):
+                                                    with st.spinner("Đang append dữ liệu..."):
+                                                        if append_to_sheet(worksheet, df_with_metadata):
+                                                            new_count = get_existing_data_count(worksheet)
+                                                            added_rows = new_count - existing_count
+                                                            st.markdown(f'<div class="success-box">✅ Append Brand Analytics thành công!<br>📊 Đã thêm {added_rows} dòng dữ liệu<br>📈 Tổng dữ liệu hiện tại: {new_count} dòng</div>', unsafe_allow_html=True)
+                                                            st.balloons()
+                                                        else:
+                                                            st.markdown('<div class="error-box">❌ Append thất bại!</div>', unsafe_allow_html=True)
+                                        else:
+                                            st.error("❌ Không có cột nào trùng khớp với sheet BA_US_2025!")
+                                    else:
+                                        st.error("❌ Không thể lấy thông tin columns từ sheet BA_US_2025!")
                                 else:
-                                    st.warning("⚠️ Vui lòng kết nối Google Sheets trước!")
+                                    st.error("❌ Không thể kết nối đến sheet BA_US_2025!")
+                            else:
+                                st.warning("⚠️ Vui lòng kết nối Google Sheets trước để kiểm tra columns!")
                     else:
                         st.error("❌ Không thể detect tháng/năm từ tên file. Vui lòng kiểm tra format tên file!")
                         st.info("📝 Format đúng: US_Search_Catalog_Performance_Simple_Month_2025_07_31.csv")
