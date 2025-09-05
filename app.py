@@ -227,6 +227,8 @@ def validate_file_format(uploaded_file, expected_format):
     """Validate uploaded file format"""
     if expected_format == "txt":
         return uploaded_file.name.endswith('.txt')
+    elif expected_format == "csv":
+        return uploaded_file.name.endswith('.csv')
     elif expected_format == "xlsx":
         return uploaded_file.name.endswith('.xlsx') or uploaded_file.name.endswith('.xls')
     return False
@@ -636,13 +638,13 @@ def main():
                                     st.warning("⚠️ Vui lòng kết nối Google Sheets trước!")
                     else:
                         st.error("❌ Không thể detect tháng/năm từ tên file. Vui lòng kiểm tra format tên file!")
-                        st.info("📝 Format đúng: US_Search_Catalog_Performance_Simple_Month_2025_07_31.xlsx")
+                        st.info("📝 Format đúng: US_Search_Catalog_Performance_Simple_Month_2025_07_31.csv")
                 else:
-                    st.error("❌ File không đúng định dạng .xlsx/.xls")
+                    st.error("❌ File không đúng định dạng .csv")
         with col2:
             st.info("""
             **📋 Hướng dẫn:**
-            1. Chọn file .xlsx Brand Analytics
+            1. Chọn file .csv Brand Analytics
             2. Hệ thống tự động detect tháng/quarter
             3. Thêm cột Month & Quarter
             4. Append vào sheet BA_US_2025
@@ -650,7 +652,7 @@ def main():
             **📝 Format tên file:**
             ```
             US_Search_Catalog_Performance_
-            Simple_Month_2025_07_31.xlsx
+            Simple_Month_2025_07_31.csv
             ```
                     
             **🔢 Quarter mapping:**
