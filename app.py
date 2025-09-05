@@ -275,7 +275,7 @@ def process_excel_file(uploaded_file):
 def process_csv_file(uploaded_file):
     """Process Excel file (.xlsx)"""
     try:
-        df = pd.read_csv(uploaded_file)
+        df = pd.read_csv(uploaded_file, skiprows=1)
         return df
     except Exception as e:
         st.error(f"❌ Lỗi đọc file Excel: {str(e)}")
